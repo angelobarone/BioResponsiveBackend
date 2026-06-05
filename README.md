@@ -47,7 +47,10 @@ pip install fastapi uvicorn pydantic scipy numpy torch transformers google-gener
 Nel file api_token.py (da creare se non presente), inserisci la tua chiave per Gemini:
 ```bash
 Python
-GeminiAPI = "LA_TUA_API_KEY_GOOGLE"
+GeminiAPI = "CHIAVE PER GEMINI"
+NgrokAPI = "CHIAVE PER NGROK"
+HuggingFaceAPI = "CHIAVE HUGGINGFACE"
+modello1 = "models/gemma-3-27b-it" //LLM (DI GOOGLE) CHE SI VUOLE UTILIZZARE
 ```
 Nota: Inserisci il tuo auth token personale di ngrok all'interno di server.py se intendi esporre il server pubblicamente.
 
