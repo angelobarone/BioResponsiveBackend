@@ -8,7 +8,7 @@
 
 * Gestione Sessioni Asincrona: Sviluppato con FastAPI, il server delega l'inferenza pesante (LLM e generazione audio) a thread in background, mantenendo gli endpoint reattivi tramite un sistema di polling dello stato.
 
-* Sistema di Caching Intelligente (AudioCache): Include un sistema di cache condivisa thread-safe (LRU-based) per evitare la rigenerazione di prompt identici, ottimizzando drasticamente i tempi di risposta (limite configurabile, default: 500MB).
+* Sistema di Caching Intelligente (AudioCache): Include un sistema di cache condivisa thread-safe per evitare la rigenerazione di prompt identici, ottimizzando drasticamente i tempi di risposta (limite configurabile, default: 500MB).
 
 * Multi-Paradigma: Supporta logiche di generazione distinte:
 
