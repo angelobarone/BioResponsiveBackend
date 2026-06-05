@@ -8,7 +8,7 @@ import api_token
 GOOGLE_API_KEY = api_token.GeminiAPI
 genai.configure(api_key=GOOGLE_API_KEY)
 
-MODEL_ID = "models/gemma-4-26b-a4b-it"
+MODEL_ID = api_token.modello1
 
 generation_config = genai.GenerationConfig(
     temperature=0.1,

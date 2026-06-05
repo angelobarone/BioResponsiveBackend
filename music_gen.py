@@ -6,6 +6,8 @@ import time
 import threading
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
 
+import api_token
+
 # INIZIALIZZAZIONE GLOBALE
 # Creiamo una cartella per salvare i brani generati durante l'allenamento
 OUT_DIR = "output_allenamento"
@@ -14,7 +16,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Accelerazione hardware attivata sul dispositivo: {device}")
 
-model_id = "facebook/musicgen-small"
+model_id = api_token.modello2
 
 print("Caricamento del modello... (potrebbe richiedere un po' di tempo al primo avvio)")
 if device == "cuda":

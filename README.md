@@ -50,7 +50,8 @@ Python
 GeminiAPI = "CHIAVE PER GEMINI"
 NgrokAPI = "CHIAVE PER NGROK"
 HuggingFaceAPI = "CHIAVE HUGGINGFACE"
-modello1 = "models/gemma-3-27b-it" //LLM (DI GOOGLE) CHE SI VUOLE UTILIZZARE
+modello1 = "models/gemma-4-26b-a4b-it" //LLM (DI GOOGLE) CHE SI VUOLE UTILIZZARE
+modello2 = "facebook/musicgen-small" //MODELLO MUSICGEN (DI META) CHE SI VUOLE UTILIZZARE
 ```
 Nota: Inserisci il tuo auth token personale di ngrok all'interno di server.py se intendi esporre il server pubblicamente.
 
