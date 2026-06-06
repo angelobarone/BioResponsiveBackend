@@ -23,6 +23,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
+from sympy import true
 
 import llm_gen
 import music_gen as gen
@@ -443,7 +444,7 @@ def _bg_update_running(session: Session, payload: dict):
                 shutil.copy2(cached_chunks[0], session_audio_path)
                 session.set_ready(session_audio_path)
             else:
-                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata)
+                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata, newStyle=True)
                 audio_path = OUTPUT_DIR / nome_file
                 audio_cache.add(categoria, audio_path)
                 session.paradigma.contatore_file = 0
@@ -483,7 +484,7 @@ def _bg_update_running(session: Session, payload: dict):
 
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria)
+            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria, newStyle=False)
             audio_path = OUTPUT_DIR / nome_file
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
@@ -523,12 +524,13 @@ def _bg_update_weightlifting(session: Session, payload: dict):
         # Poiché generiamo e serviamo entrambe le tracce in parallelo, usiamo un solo contatore come riferimento
         chunk_idx = session.paradigma.contatore_ritmato
 
-        def genera_e_salva():
+        def genera_e_salva(newStyle: bool = False):
             nome_calmo, nome_ritmato = session.paradigma.aggiorna(
                 prompt_lifting=lifting_prompt,
                 prompt_resting=recovery_prompt,
                 session_id=session.session_id,
                 categoria=session.categoria,
+                newStyle=newStyle,
             )
             path_calmo = OUTPUT_DIR / nome_calmo
             path_ritmato = OUTPUT_DIR / nome_ritmato
@@ -566,7 +568,7 @@ def _bg_update_weightlifting(session: Session, payload: dict):
                 # Categoria non in cache o chunk 01 mancante: genera da zero
                 session.paradigma.contatore_calmo = 1
                 session.paradigma.contatore_ritmato = 1
-                genera_e_salva()
+                genera_e_salva(newStyle=True)
 
         # 4. Logica a parità di categoria
         else:
@@ -595,7 +597,7 @@ def _bg_update_weightlifting(session: Session, payload: dict):
                 # --- CACHE MISS ---
                 log.info(
                     f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione coppia {chunk_idx:02d}")
-                genera_e_salva()
+                genera_e_salva(newStyle=False)
 
         # 5. Pulizia dei vecchi file
         for old_path in (old_path1, old_path2):
@@ -639,7 +641,7 @@ def _bg_update_yoga(session: Session, payload: dict):
                 session.set_ready(session_audio_path)
             else:
                 # Nuova categoria mai vista: genera da zero con il nuovo prompt
-                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata)
+                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata, newStyle=True)
                 audio_path = OUTPUT_DIR / nome_file
                 audio_cache.add(categoria, audio_path)
                 session.paradigma.contatore_file = 0
@@ -679,7 +681,7 @@ def _bg_update_yoga(session: Session, payload: dict):
         else:
             # --- CACHE MISS ---
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria)
+            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria, newStyle=False)
             audio_path = OUTPUT_DIR / nome_file
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
