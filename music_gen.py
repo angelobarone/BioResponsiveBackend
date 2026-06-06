@@ -119,7 +119,7 @@ def genera_continuazione(prompt, audio_precedente, durata_secondi=22, secondi_co
 
 class ParadigmaRunning:
     def __init__(self, prompt_iniziale="Fast electronic running beat, high energy, 130 bpm",
-                 audio_iniziale=None, session_id: str = ""):
+                 audio_iniziale=None, session_id: str = "", categoria: str = ""):
         print(f"\n=== Inizializzazione Paradigma RUNNING ===")
         self.prompt_base = prompt_iniziale
         self.contatore_file = 1
@@ -132,10 +132,10 @@ class ParadigmaRunning:
             # Cache miss: genera normalmente
             self.ultimo_audio = genera_brano_iniziale(self.prompt_base, 30)
             prefix = f"{session_id}_" if session_id else ""
-            salva_audio(f"{prefix}running_chunk_{self.contatore_file:02d}.wav", self.ultimo_audio)
+            salva_audio(f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav", self.ultimo_audio)
             self.contatore_file += 1
 
-    def aggiorna(self, session_id: str = ""):
+    def aggiorna(self, session_id: str = "", categoria: str = ""):
         print(f"\n[RUNNING] Generazione nuovo segmento (Chunk {self.contatore_file})")
 
         audio_grezzo, campioni_prompt = genera_continuazione(
@@ -149,7 +149,7 @@ class ParadigmaRunning:
         solo_nuovo_audio = audio_grezzo[campioni_prompt:]
 
         prefix = f"{session_id}_" if session_id else ""
-        nome_file = f"{prefix}running_chunk_{self.contatore_file:02d}.wav"
+        nome_file = f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav"
         salva_audio(nome_file, solo_nuovo_audio)
 
         self.ultimo_audio = audio_grezzo
@@ -159,7 +159,7 @@ class ParadigmaRunning:
 class ParadigmaWeightlifting:
     def __init__(self, prompt_resting="Calm lo-fi beats for resting",
                  prompt_lifting="Heavy metal or trap beat for lifting",
-                 audio_iniziale_calmo=None, audio_iniziale_ritmato=None, session_id: str = ""):
+                 audio_iniziale_calmo=None, audio_iniziale_ritmato=None, session_id: str = "", categoria: str = ""):
         print(f"\n=== Inizializzazione Paradigma WEIGHTLIFTING ===")
         self.prompt_calmo = prompt_resting
         self.prompt_ritmato = prompt_lifting
@@ -172,7 +172,7 @@ class ParadigmaWeightlifting:
         else:
             self.ultimo_calmo = genera_brano_iniziale(self.prompt_calmo, 30)
             prefix = f"{session_id}_" if session_id else ""
-            salva_audio(f"{prefix}weightlifting_calmo_chunk_{self.contatore_calmo:02d}.wav", self.ultimo_calmo)
+            salva_audio(f"{prefix}{categoria}_calmo_chunk_{self.contatore_calmo:02d}.wav", self.ultimo_calmo)
             self.contatore_calmo += 1
 
         if audio_iniziale_ritmato is not None:
@@ -187,10 +187,10 @@ class ParadigmaWeightlifting:
                 guidance=3.0,
             )
             prefix = f"{session_id}_" if session_id else ""
-            salva_audio(f"{prefix}weightlifting_ritmato_chunk_{self.contatore_ritmato:02d}.wav", self.ultimo_ritmato)
+            salva_audio(f"{prefix}{categoria}_ritmato_chunk_{self.contatore_ritmato:02d}.wav", self.ultimo_ritmato)
             self.contatore_ritmato += 1
 
-    def aggiorna(self, prompt_resting=None, prompt_lifting=None, session_id: str = ""):
+    def aggiorna(self, prompt_resting=None, prompt_lifting=None, session_id: str = "", categoria: str = ""):
         print(f"\n[WEIGHTLIFTING] Generazione nuovi segmenti")
 
         # BUG FIX: era "is None" — non aggiornava mai il prompt calmo
@@ -211,7 +211,7 @@ class ParadigmaWeightlifting:
             guidance=2.0
         )
         solo_nuovo_calmo = audio_grezzo_calmo[prompt_calmo_len:]
-        nome_calmo = f"{prefix}weightlifting_calmo_chunk_{self.contatore_calmo:02d}.wav"
+        nome_calmo = f"{prefix}{categoria}_calmo_chunk_{self.contatore_calmo:02d}.wav"
         salva_audio(nome_calmo, solo_nuovo_calmo)
         self.ultimo_calmo = audio_grezzo_calmo
         self.contatore_calmo += 1
@@ -225,7 +225,7 @@ class ParadigmaWeightlifting:
             guidance=2.0
         )
         solo_nuovo_ritmato = audio_grezzo_ritmato[prompt_ritmato_len:]
-        nome_ritmato = f"{prefix}weightlifting_ritmato_chunk_{self.contatore_ritmato:02d}.wav"
+        nome_ritmato = f"{prefix}{categoria}_ritmato_chunk_{self.contatore_ritmato:02d}.wav"
         salva_audio(nome_ritmato, solo_nuovo_ritmato)
         self.ultimo_ritmato = audio_grezzo_ritmato
         self.contatore_ritmato += 1
@@ -235,7 +235,7 @@ class ParadigmaWeightlifting:
 
 class ParadigmaYoga:
     def __init__(self, prompt_iniziale="Ambient drone zen, very slow, relaxing",
-                 audio_iniziale=None, session_id: str = ""):
+                 audio_iniziale=None, session_id: str = "", categoria: str = ""):
         print(f"\n=== Inizializzazione Paradigma YOGA ===")
         self.prompt_base = prompt_iniziale
         self.contatore_file = 1
@@ -246,10 +246,10 @@ class ParadigmaYoga:
         else:
             self.ultimo_audio = genera_brano_iniziale(self.prompt_base, 30)
             prefix = f"{session_id}_" if session_id else ""
-            salva_audio(f"{prefix}yoga_chunk_{self.contatore_file:02d}.wav", self.ultimo_audio)
+            salva_audio(f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav", self.ultimo_audio)
             self.contatore_file += 1
 
-    def aggiorna(self, session_id: str = ""):
+    def aggiorna(self, session_id: str = "", categoria: str = ""):
         print(f"\n[YOGA] Generazione nuovo segmento (Chunk {self.contatore_file})")
 
         audio_grezzo, campioni_prompt = genera_continuazione(
@@ -264,7 +264,7 @@ class ParadigmaYoga:
 
         # Nome file con prefisso session_id se fornito
         prefix = f"{session_id}_" if session_id else ""
-        nome_file = f"{prefix}yoga_chunk_{self.contatore_file:02d}.wav"
+        nome_file = f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav"
         salva_audio(nome_file, solo_nuovo_audio)
 
         self.ultimo_audio = audio_grezzo

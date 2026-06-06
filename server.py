@@ -146,8 +146,8 @@ class AudioCache:
             if src_path2:
                 # chunk_idx basato su coppie: ogni coppia conta come 1
                 chunk_idx = (len(existing) // 2) + 1
-                dst1 = cat_dir / f"chunk_lifting_{chunk_idx:03d}.wav"
-                dst2 = cat_dir / f"chunk_resting_{chunk_idx:03d}.wav"
+                dst1 = cat_dir / f"{categoria}_chunk_lifting_{chunk_idx:03d}.wav"
+                dst2 = cat_dir / f"{categoria}_chunk_resting_{chunk_idx:03d}.wav"
                 shutil.copy2(src_path1, dst1)
                 shutil.copy2(src_path2, dst2)  # era src_path1 — bug
                 log.info(f"[CACHE] Aggiunti '{dst1.name}' e '{dst2.name}' in '{categoria}'")
@@ -156,7 +156,7 @@ class AudioCache:
                 return dst1
             else:
                 chunk_idx = len(existing) + 1
-                dst = cat_dir / f"chunk_{chunk_idx:03d}.wav"
+                dst = cat_dir / f"{categoria}_chunk_{chunk_idx:03d}.wav"
                 shutil.copy2(src_path1, dst)
                 log.info(f"[CACHE] Aggiunto '{dst.name}' in '{categoria}'")
                 self._index.setdefault(categoria, []).append(dst)
@@ -299,14 +299,15 @@ def _bg_init_running(session: Session, payload: dict):
                 prompt_iniziale=musicgen_prompt,
                 audio_iniziale=audio_iniziale,
                 session_id=session.session_id,
+                categoria=categoria,
             )
             session.paradigma = paradigma
             session.set_ready(cached_chunks[0])
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            paradigma = gen.ParadigmaRunning(prompt_iniziale=musicgen_prompt)
+            paradigma = gen.ParadigmaRunning(prompt_iniziale=musicgen_prompt, categoria=categoria)
             session.paradigma = paradigma
-            audio_path = _copy_for_session(session.session_id, "running_chunk_01.wav")
+            audio_path = _copy_for_session(session.session_id, f"{categoria}_chunk_01.wav")
             # Salva il chunk generato in cache per sessioni future
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
@@ -346,6 +347,7 @@ def _bg_init_weightlifting(session: Session, payload: dict):
                 audio_iniziale_calmo=audio_calmo,
                 audio_iniziale_ritmato=audio_ritmato,
                 session_id=session.session_id,
+                categoria=session.categoria,
             )
             session.paradigma = paradigma
             session.set_ready(
@@ -357,11 +359,12 @@ def _bg_init_weightlifting(session: Session, payload: dict):
             paradigma = gen.ParadigmaWeightlifting(
                 prompt_resting=recovery_prompt,
                 prompt_lifting=lifting_prompt,
+                categoria=session.categoria,
             )
             session.paradigma = paradigma
 
-            wav_name1 = "weightlifting_ritmato_chunk_01.wav"
-            wav_name2 = "weightlifting_calmo_chunk_01.wav"
+            wav_name1 = f"{session.categoria}_ritmato_chunk_01.wav"
+            wav_name2 = f"{session.categoria}_calmo_chunk_01.wav"
 
             audio_path1 = _copy_for_session(session.session_id, wav_name1)
             audio_path2 = _copy_for_session(session.session_id, wav_name2)
@@ -389,14 +392,15 @@ def _bg_init_yoga(session: Session, payload: dict):
                 prompt_iniziale=musicgen_prompt,
                 audio_iniziale=audio_iniziale,
                 session_id=session.session_id,
+                categoria=session.categoria,
             )
             session.paradigma = paradigma
             session.set_ready(cached_chunks[0])
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            paradigma = gen.ParadigmaYoga(prompt_iniziale=musicgen_prompt)
+            paradigma = gen.ParadigmaYoga(prompt_iniziale=musicgen_prompt, categoria=session.categoria)
             session.paradigma = paradigma
-            audio_path = _copy_for_session(session.session_id, "yoga_chunk_01.wav")
+            audio_path = _copy_for_session(session.session_id, f"{categoria}_chunk_01.wav")
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
 
@@ -434,15 +438,15 @@ def _bg_update_running(session: Session, payload: dict):
             if cached_chunks:
                 audio_iniziale = scipy.io.wavfile.read(cached_chunks[0])[1].astype("float32")
                 session.paradigma.ultimo_audio = audio_iniziale
-                session.paradigma.contatore_file = 2
-                session_audio_path = OUTPUT_DIR / f"{session.session_id}_running_chunk_01.wav"
+                session.paradigma.contatore_file = 0
+                session_audio_path = OUTPUT_DIR / f"{session.session_id}_running_{categoria_cambiata}_chunk_01.wav"
                 shutil.copy2(cached_chunks[0], session_audio_path)
                 session.set_ready(session_audio_path)
             else:
-                nome_file = session.paradigma.aggiorna(session_id=session.session_id)
+                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata)
                 audio_path = OUTPUT_DIR / nome_file
                 audio_cache.add(categoria, audio_path)
-                session.paradigma.contatore_file = 2
+                session.paradigma.contatore_file = 0
                 session.set_ready(audio_path)
 
             if old_path and old_path.exists() and CACHE_DIR not in old_path.parents:
@@ -479,7 +483,7 @@ def _bg_update_running(session: Session, payload: dict):
 
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            nome_file = session.paradigma.aggiorna(session_id=session.session_id)
+            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria)
             audio_path = OUTPUT_DIR / nome_file
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
@@ -524,6 +528,7 @@ def _bg_update_weightlifting(session: Session, payload: dict):
                 prompt_lifting=lifting_prompt,
                 prompt_resting=recovery_prompt,
                 session_id=session.session_id,
+                categoria=session.categoria,
             )
             path_calmo = OUTPUT_DIR / nome_calmo
             path_ritmato = OUTPUT_DIR / nome_ritmato
@@ -547,8 +552,8 @@ def _bg_update_weightlifting(session: Session, payload: dict):
 
                 session.paradigma.ultimo_calmo = audio_calmo
                 session.paradigma.ultimo_ritmato = audio_ritmato
-                session.paradigma.contatore_calmo = 2
-                session.paradigma.contatore_ritmato = 2
+                session.paradigma.contatore_calmo = 1
+                session.paradigma.contatore_ritmato = 1
 
                 session_path_calmo = OUTPUT_DIR / f"{session.session_id}_{path_calmo_cache.name}"
                 session_path_ritmato = OUTPUT_DIR / f"{session.session_id}_{path_ritmato_cache.name}"
@@ -565,8 +570,8 @@ def _bg_update_weightlifting(session: Session, payload: dict):
 
         # 4. Logica a parità di categoria
         else:
-            target_calmo = f"weightlifting_resting_{chunk_idx:02d}.wav"
-            target_ritmato = f"weightlifting_lifting_{chunk_idx:02d}.wav"
+            target_calmo = f"weightlifting_resting_{session.categoria}_{chunk_idx:02d}.wav"
+            target_ritmato = f"weightlifting_lifting_{session.categoria}_{chunk_idx:02d}.wav"
 
             cached_chunks = audio_cache.get(categoria) or []
             path_calmo_cache = next((p for p in cached_chunks if target_calmo in p.name), None)
@@ -622,22 +627,22 @@ def _bg_update_yoga(session: Session, payload: dict):
         session.paradigma.prompt_base = new_prompt
 
         if categoria_cambiata:
-            log.info(f"[{session.session_id}] Cambio categoria: '{categoria}' — reset contesto audio")
+            log.info(f"[{session.session_id}] Cambio categoria: '{categoria_cambiata}' — reset contesto audio")
             cached_chunks = audio_cache.get(categoria)
 
             if cached_chunks:
                 audio_iniziale = scipy.io.wavfile.read(cached_chunks[0])[1].astype("float32")
                 session.paradigma.ultimo_audio = audio_iniziale
-                session.paradigma.contatore_file = 2
-                session_audio_path = OUTPUT_DIR / f"{session.session_id}_yoga_chunk_01.wav"
+                session.paradigma.contatore_file = 0
+                session_audio_path = OUTPUT_DIR / f"{session.session_id}_yoga_{categoria_cambiata}_chunk_01.wav"
                 shutil.copy2(cached_chunks[0], session_audio_path)
                 session.set_ready(session_audio_path)
             else:
                 # Nuova categoria mai vista: genera da zero con il nuovo prompt
-                nome_file = session.paradigma.aggiorna(session_id=session.session_id)
+                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata)
                 audio_path = OUTPUT_DIR / nome_file
                 audio_cache.add(categoria, audio_path)
-                session.paradigma.contatore_file = 2
+                session.paradigma.contatore_file = 0
                 session.set_ready(audio_path)
 
             if old_path and old_path.exists() and CACHE_DIR not in old_path.parents:
@@ -662,7 +667,7 @@ def _bg_update_yoga(session: Session, payload: dict):
             log.info(f"[{session.session_id}] Cache HIT per '{categoria}': trovato {target_filename}")
 
             chunk_idx = session.paradigma.contatore_file
-            wav_name = f"yoga_chunk_{chunk_idx:02d}.wav"
+            wav_name = f"yoga_{categoria}_chunk_{chunk_idx:02d}.wav"
 
             session_audio_path = OUTPUT_DIR / f"{session.session_id}_{wav_name}"
             shutil.copy2(target_path_in_cache, session_audio_path)
@@ -674,7 +679,7 @@ def _bg_update_yoga(session: Session, payload: dict):
         else:
             # --- CACHE MISS ---
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            nome_file = session.paradigma.aggiorna(session_id=session.session_id)
+            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria)
             audio_path = OUTPUT_DIR / nome_file
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
@@ -781,7 +786,7 @@ def update_session(session_id: str, request: UpdateRequest, background_tasks: Ba
             name=f"update-{session_id[:8]}",
         )
         thread.start()
-        log.info(f"Aggiornamento sessione {session_id} avviato.")
+        log.info(f"Aggiornamento sessione {session_id} avviato: {payload}")
         return {
             "session_id": session_id,
             "status": SessionStatus.READY,
