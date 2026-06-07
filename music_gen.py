@@ -130,7 +130,7 @@ class ParadigmaRunning:
             self.ultimo_audio = audio_iniziale
         else:
             # Cache miss: genera normalmente
-            self.ultimo_audio = genera_brano_iniziale(self.prompt_base, 30)
+            self.ultimo_audio = genera_brano_iniziale(self.prompt_base)
             prefix = f"{session_id}_" if session_id else ""
             salva_audio(f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav", self.ultimo_audio)
             self.contatore_file += 1
@@ -139,7 +139,7 @@ class ParadigmaRunning:
         print(f"\n[RUNNING] Generazione nuovo segmento (Chunk {self.contatore_file})")
 
         if newStyle:
-            audio_grezzo, campioni_prompt = genera_brano_iniziale(self.prompt_base, 30)
+            solo_nuovo_audio = genera_brano_iniziale(self.prompt_base, 30)
         else :
             audio_grezzo, campioni_prompt = genera_continuazione(
                 prompt=self.prompt_base,
@@ -148,14 +148,13 @@ class ParadigmaRunning:
                 secondi_contesto=8,
                 guidance=2.0
             )
-
-        solo_nuovo_audio = audio_grezzo[campioni_prompt:]
+            solo_nuovo_audio = audio_grezzo[campioni_prompt:]
 
         prefix = f"{session_id}_" if session_id else ""
         nome_file = f"{prefix}{categoria}_chunk_{self.contatore_file:02d}.wav"
         salva_audio(nome_file, solo_nuovo_audio)
 
-        self.ultimo_audio = audio_grezzo
+        self.ultimo_audio = solo_nuovo_audio
         self.contatore_file += 1
         return nome_file
 
@@ -173,7 +172,7 @@ class ParadigmaWeightlifting:
             print(f"  [CACHE HIT] Audio calmo fornito dall'esterno, skip generazione.")
             self.ultimo_calmo = audio_iniziale_calmo
         else:
-            self.ultimo_calmo = genera_brano_iniziale(self.prompt_calmo, 30)
+            self.ultimo_calmo = genera_brano_iniziale(self.prompt_calmo)
             prefix = f"{session_id}_" if session_id else ""
             salva_audio(f"{prefix}{categoria}_calmo_chunk_{self.contatore_calmo:02d}.wav", self.ultimo_calmo)
             self.contatore_calmo += 1
@@ -206,7 +205,7 @@ class ParadigmaWeightlifting:
         prefix = f"{session_id}_" if session_id else ""
 
         if newStyle:
-            solo_nuovo_calmo = genera_brano_iniziale(self.prompt_calmo, 30)
+            solo_nuovo_calmo = genera_brano_iniziale(self.prompt_calmo)
 
         else:
             audio_grezzo_calmo, prompt_calmo_len = genera_continuazione(

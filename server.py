@@ -7,7 +7,6 @@
   DELETE /session/{id}         → Chiude e pulisce una sessione
 """
 import io
-import re
 import shutil
 import uuid
 import time
@@ -17,16 +16,14 @@ import zipfile
 from enum import Enum
 from pathlib import Path
 from typing import Optional
-
 import scipy
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
-from sympy import true
-
 import llm_gen
 import music_gen as gen
+import api_token
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,7 +77,7 @@ class AudioCache:
         """Ricostruisce l'indice in memoria scansionando la directory cache al boot."""
         for cat_dir in sorted(CACHE_DIR.iterdir()):
             if cat_dir.is_dir():
-                chunks = sorted(cat_dir.glob("chunk_*.wav"))
+                chunks = sorted(cat_dir.glob("*.wav"))
                 if chunks:
                     self._index[cat_dir.name] = chunks
                     log.info(f"[CACHE] Categoria '{cat_dir.name}' caricata: {len(chunks)} chunk")
@@ -132,9 +129,10 @@ class AudioCache:
             if not chunks:
                 return None
 
-            # Filtra solo i file che esistono davvero nel file system
             valid_chunks = [p for p in chunks if p.exists()]
-
+            self._index[categoria] = valid_chunks
+            if not valid_chunks:
+                del self._index[categoria]
             return valid_chunks if valid_chunks else None
 
     def add(self, categoria: str, src_path1: Path, src_path2: Path = None) -> Path:
@@ -303,7 +301,9 @@ def _bg_init_running(session: Session, payload: dict):
                 categoria=categoria,
             )
             session.paradigma = paradigma
-            session.set_ready(cached_chunks[0])
+            session_audio_path = OUTPUT_DIR / f"{session.session_id}_{cached_chunks[0].name}"
+            shutil.copy2(cached_chunks[0], session_audio_path)
+            session.set_ready(session_audio_path)
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
             paradigma = gen.ParadigmaRunning(prompt_iniziale=musicgen_prompt, categoria=categoria)
@@ -396,7 +396,9 @@ def _bg_init_yoga(session: Session, payload: dict):
                 categoria=session.categoria,
             )
             session.paradigma = paradigma
-            session.set_ready(cached_chunks[0])
+            session_audio_path = OUTPUT_DIR / f"{session.session_id}_{cached_chunks[0].name}"
+            shutil.copy2(cached_chunks[0], session_audio_path)
+            session.set_ready(session_audio_path)
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
             paradigma = gen.ParadigmaYoga(prompt_iniziale=musicgen_prompt, categoria=session.categoria)
@@ -415,7 +417,6 @@ def _bg_init_yoga(session: Session, payload: dict):
 # AGGIORNAMENTO in background
 def _bg_update_running(session: Session, payload: dict):
     try:
-        session.set_generating()
         log.info(f"[{session.session_id}] Aggiornamento Running...")
 
         old_path = session.latest_audio_path
@@ -440,7 +441,7 @@ def _bg_update_running(session: Session, payload: dict):
                 audio_iniziale = scipy.io.wavfile.read(cached_chunks[0])[1].astype("float32")
                 session.paradigma.ultimo_audio = audio_iniziale
                 session.paradigma.contatore_file = 0
-                session_audio_path = OUTPUT_DIR / f"{session.session_id}_running_{categoria_cambiata}_chunk_01.wav"
+                session_audio_path = OUTPUT_DIR / f"{session.session_id}_running_{categoria}_chunk_01.wav"
                 shutil.copy2(cached_chunks[0], session_audio_path)
                 session.set_ready(session_audio_path)
             else:
@@ -456,7 +457,7 @@ def _bg_update_running(session: Session, payload: dict):
 
         # Stessa categoria — logica cache hit/miss invariata
         target_chunk_number = session.paradigma.contatore_file + 1
-        target_filename = f"chunk_{target_chunk_number:03d}.wav"
+        target_filename = f"{categoria}_chunk_{target_chunk_number:03d}.wav"
         cached_chunks = audio_cache.get(categoria)
         target_path_in_cache = None
 
@@ -484,7 +485,7 @@ def _bg_update_running(session: Session, payload: dict):
 
         else:
             log.info(f"[{session.session_id}] Cache MISS per '{categoria}': avvio generazione")
-            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=session.categoria, newStyle=False)
+            nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria, newStyle=False)
             audio_path = OUTPUT_DIR / nome_file
             audio_cache.add(categoria, audio_path)
             session.set_ready(audio_path)
@@ -500,7 +501,6 @@ def _bg_update_running(session: Session, payload: dict):
 
 def _bg_update_weightlifting(session: Session, payload: dict):
     try:
-        session.set_generating()
         log.info(f"[{session.session_id}] Aggiornamento Weightlifting...")
 
         old_path1 = session.latest_audio_path
@@ -572,8 +572,8 @@ def _bg_update_weightlifting(session: Session, payload: dict):
 
         # 4. Logica a parità di categoria
         else:
-            target_calmo = f"weightlifting_resting_{session.categoria}_{chunk_idx:02d}.wav"
-            target_ritmato = f"weightlifting_lifting_{session.categoria}_{chunk_idx:02d}.wav"
+            target_calmo = f"{categoria}_chunk_resting_{chunk_idx:03d}.wav"
+            target_ritmato = f"{categoria}_chunk_lifting_{chunk_idx:03d}.wav"
 
             cached_chunks = audio_cache.get(categoria) or []
             path_calmo_cache = next((p for p in cached_chunks if target_calmo in p.name), None)
@@ -611,7 +611,6 @@ def _bg_update_weightlifting(session: Session, payload: dict):
 
 def _bg_update_yoga(session: Session, payload: dict):
     try:
-        session.set_generating()
         log.info(f"[{session.session_id}] Aggiornamento Yoga...")
 
         old_path = session.latest_audio_path
@@ -636,12 +635,12 @@ def _bg_update_yoga(session: Session, payload: dict):
                 audio_iniziale = scipy.io.wavfile.read(cached_chunks[0])[1].astype("float32")
                 session.paradigma.ultimo_audio = audio_iniziale
                 session.paradigma.contatore_file = 0
-                session_audio_path = OUTPUT_DIR / f"{session.session_id}_yoga_{categoria_cambiata}_chunk_01.wav"
+                session_audio_path = OUTPUT_DIR / f"{session.session_id}_yoga_{categoria}_chunk_01.wav"
                 shutil.copy2(cached_chunks[0], session_audio_path)
                 session.set_ready(session_audio_path)
             else:
                 # Nuova categoria mai vista: genera da zero con il nuovo prompt
-                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria_cambiata, newStyle=True)
+                nome_file = session.paradigma.aggiorna(session_id=session.session_id, categoria=categoria, newStyle=True)
                 audio_path = OUTPUT_DIR / nome_file
                 audio_cache.add(categoria, audio_path)
                 session.paradigma.contatore_file = 0
@@ -653,7 +652,7 @@ def _bg_update_yoga(session: Session, payload: dict):
 
         # Calcolo del nome esatto del chunk
         target_chunk_number = session.paradigma.contatore_file + 1
-        target_filename = f"chunk_{target_chunk_number:03d}.wav"
+        target_filename = f"{categoria}_chunk_{target_chunk_number:03d}.wav"
 
         cached_chunks = audio_cache.get(categoria)
         target_path_in_cache = None
@@ -773,33 +772,41 @@ def start_session(request: StartRequest, background_tasks: BackgroundTasks):
 def update_session(session_id: str, request: UpdateRequest, background_tasks: BackgroundTasks):
     session = _get_session(session_id)
 
-    if session.status == SessionStatus.READY:
-        payload = request.payload
-        activity = payload.get("activity", session.activity)
+    # ✅ Check e transizione di stato ATOMICI sotto lo stesso lock
+    with session._lock:
+        if session.status != SessionStatus.READY:
+            return {
+                "session_id": session_id,
+                "status": session.status,
+                "message": "Sessione ancora in generazione. Riprova più tardi.",
+            }
+        # Transizione immediata PRIMA di avviare il thread
+        session.status = SessionStatus.GENERATING
+        session.updated_at = time.time()
 
-        if activity not in _UPDATE_HANDLERS:
-            raise HTTPException(status_code=400, detail=f"Attività '{activity}' non supportata.")
+    payload = request.payload
+    activity = payload.get("activity", session.activity)
 
-        handler = _UPDATE_HANDLERS[activity]
-        thread = threading.Thread(
-            target=handler,
-            args=(session, payload),
-            daemon=True,
-            name=f"update-{session_id[:8]}",
-        )
-        thread.start()
-        log.info(f"Aggiornamento sessione {session_id} avviato: {payload}")
-        return {
-            "session_id": session_id,
-            "status": SessionStatus.READY,
-            "message": "Aggiornamento avviato. Usa GET /session/{session_id}/status per il polling.",
-        }
-    else:
-        return {
-            "session_id": session_id,
-            "status": SessionStatus.GENERATING,
-            "message": "Aggiornamento avviato. Usa GET /session/{session_id}/status per il polling.",
-        }
+    if activity not in _UPDATE_HANDLERS:
+        # Rollback se il payload è invalido
+        with session._lock:
+            session.status = SessionStatus.READY
+        raise HTTPException(status_code=400, detail=f"Attività '{activity}' non supportata.")
+
+    handler = _UPDATE_HANDLERS[activity]
+    thread = threading.Thread(
+        target=handler,
+        args=(session, payload),
+        daemon=True,
+        name=f"update-{session_id[:8]}",
+    )
+    thread.start()
+    log.info(f"Aggiornamento sessione {session_id} avviato: {payload}")
+    return {
+        "session_id": session_id,
+        "status": SessionStatus.GENERATING,
+        "message": "Aggiornamento avviato. Usa GET /session/{session_id}/status per il polling.",
+    }
 
 
 
@@ -944,7 +951,7 @@ if __name__ == "__main__":
     time.sleep(2)
 
     # Ora apri il tunnel
-    ngrok.set_auth_token("3DUXjD1pVA9RanjW3Ud5Um3ix52_87jx7vVT5zAfecbFwKYDg")
+    ngrok.set_auth_token(api_token.NgrokAPI)
     tunnel = ngrok.connect(8000)
     log.info(f"URL pubblico ngrok: {tunnel.public_url}")
 
